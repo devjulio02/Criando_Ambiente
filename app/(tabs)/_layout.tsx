@@ -34,6 +34,14 @@ export default function TabLayout() {
 <           MaterialCommunityIcons name="format-list-bulleted" size={28} color={color} />          ),
         }}
       />
+      <Tabs.Screen
+        name="coletas"
+        options={{
+          title: "Coletas",
+          tabBarIcon: ({ color }) => (
+<           MaterialCommunityIcons name="calendar" size={28} color={color} />          ),
+        }}
+      />
     </Tabs>
   );
 }

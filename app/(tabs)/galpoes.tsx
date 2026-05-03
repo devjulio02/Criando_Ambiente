@@ -1,5 +1,12 @@
-import { StyleSheet, TouchableOpacity, Modal, TextInput, View, Text } from "react-native";
 import { useState } from "react";
+import {
+  Modal,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 import ParallaxScrollView from "@/components/parallax-scroll-view";
 import { ThemedText } from "@/components/themed-text";
@@ -7,34 +14,84 @@ import { ThemedView } from "@/components/themed-view";
 
 // Formato de um Galpão para iniciar a lista vazia
 type Galpao = {
-  id: string;
+  id: number;
   nome: string;
-  capacidade: string;
+  capacidade: number;
 };
 
 export default function GalpoesScreen() {
   // A lista inicia vazia
   const [galpoes, setGalpoes] = useState<Galpao[]>([]);
-  
+
   const [modalVisible, setModalVisible] = useState(false);
-  
-  const [novoNome, setNovoNome] = useState('');
-  const [novaCap, setNovaCap] = useState('');
+
+  const [editarGalpao, setEditarGalpao] = useState<Galpao>();
+
+  const [novoNome, setNovoNome] = useState("");
+  const [novaCap, setNovaCap] = useState("");
 
   const salvarGalpao = () => {
-    if (novoNome.trim() === '' || novaCap.trim() === '') return;
+    if (!editarGalpao) {
+      if (novoNome.trim() === "" || novaCap.trim() === "") return;
+      const novo = {
+        id: Date.now(),
+        nome: novoNome,
+        capacidade: Number(novaCap),
+      };
 
-    const novo = {
-      id: Math.random().toString(),
-      nome: novoNome,
-      capacidade: novaCap 
-    };
+      setGalpoes([...galpoes, novo]);
 
-    setGalpoes([...galpoes, novo]);
-    
-    setNovoNome('');
-    setNovaCap('');
-    setModalVisible(false);
+      setNovoNome("");
+      setNovaCap("");
+
+      setModalVisible(false);
+    } else {
+      const editar = {
+        id: editarGalpao.id,
+        nome: novoNome,
+        capacidade: Number(novaCap),
+      };
+
+      setGalpoes(
+        galpoes.map((galpao) => {
+          if (galpao.id === editarGalpao.id) {
+            return editar;
+          } else {
+            return galpao;
+          }
+        }),
+      );
+
+      setNovoNome("");
+      setNovaCap("");
+      setEditarGalpao(undefined);
+      setModalVisible(false);
+    }
+  };
+
+  const prepararEdicao = (galpaoClicado: Galpao) => {
+    setEditarGalpao(galpaoClicado);
+    setNovoNome(galpaoClicado.nome);
+    setNovaCap(galpaoClicado.capacidade.toString());
+    setModalVisible(true);
+  };
+
+  const deletarGalpao = () => {
+    if (editarGalpao) {
+      setGalpoes(galpoes.filter((galpao) => galpao.id !== editarGalpao.id));
+
+      setNovoNome("");
+      setNovaCap("");
+      setEditarGalpao(undefined);
+      setModalVisible(false);
+    }
+  };
+
+  const abrirModalNovo = () => {
+    setEditarGalpao(undefined);
+    setNovoNome("");
+    setNovaCap("");
+    setModalVisible(true);
   };
 
   return (
@@ -42,23 +99,33 @@ export default function GalpoesScreen() {
       <ParallaxScrollView
         headerBackgroundColor={{ light: "#ffffff", dark: "#000000" }}
         headerImage={
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.addButtonHeader}
-            onPress={() => setModalVisible(true)}
+            onPress={abrirModalNovo}
           >
-            <ThemedText style={styles.addButtonText}>+ Adicionar Galpão</ThemedText>
+            <ThemedText style={styles.addButtonText}>
+              + Adicionar Galpão
+            </ThemedText>
           </TouchableOpacity>
         }
       >
         <ThemedView style={styles.containerLista}>
-          <ThemedText type="title" style={{ marginBottom: 15 }}>Meus Galpões</ThemedText>
-          
+          <ThemedText type="title" style={{ marginBottom: 15 }}>
+            Meus Galpões
+          </ThemedText>
+
           {/* Onde os cards da lista são desenhados */}
           {galpoes.map((galpao) => (
-            <View key={galpao.id} style={styles.card}>
-              <ThemedText type="subtitle" style={styles.cardTitle}>Nome: {galpao.nome}</ThemedText>
+            <TouchableOpacity
+              key={galpao.id}
+              style={styles.card}
+              onPress={() => prepararEdicao(galpao)}
+            >
+              <ThemedText type="subtitle" style={styles.cardTitle}>
+                Nome: {galpao.nome}
+              </ThemedText>
               <ThemedText>Capacidade: {galpao.capacidade} aves</ThemedText>
-            </View>
+            </TouchableOpacity>
           ))}
         </ThemedView>
       </ParallaxScrollView>
@@ -71,7 +138,9 @@ export default function GalpoesScreen() {
       >
         <View style={styles.modalFundo}>
           <View style={styles.modalCaixa}>
-            <Text style={styles.modalTitulo}>Novo Galpão</Text>
+            <Text style={styles.modalTitulo}>
+              {editarGalpao ? "Editar Galpão" : "Novo Galpão"}
+            </Text>
 
             <TextInput
               style={styles.input}
@@ -91,15 +160,24 @@ export default function GalpoesScreen() {
             />
 
             <View style={styles.botoesContainer}>
-              <TouchableOpacity 
-                style={[styles.botao, styles.botaoCancelar]} 
+              <TouchableOpacity
+                style={[styles.botao, styles.botaoCancelar]}
                 onPress={() => setModalVisible(false)}
               >
                 <Text style={styles.textoBotao}>Cancelar</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity 
-                style={[styles.botao, styles.botaoSalvar]} 
+              {editarGalpao && (
+                <TouchableOpacity
+                  style={[styles.botao, styles.botaoDeletar]}
+                  onPress={deletarGalpao}
+                >
+                  <Text style={styles.textoBotao}>Deletar</Text>
+                </TouchableOpacity>
+              )}
+
+              <TouchableOpacity
+                style={[styles.botao, styles.botaoSalvar]}
                 onPress={salvarGalpao}
               >
                 <Text style={styles.textoBotao}>Salvar</Text>
@@ -114,81 +192,85 @@ export default function GalpoesScreen() {
 
 const styles = StyleSheet.create({
   addButtonHeader: {
-    alignSelf: 'center',
+    alignSelf: "center",
     marginTop: 100,
-    backgroundColor: '#d97706',
+    backgroundColor: "#d97706",
     paddingVertical: 14,
     paddingHorizontal: 32,
     borderRadius: 30,
     elevation: 6,
   },
   addButtonText: {
-    color: '#ffffff',
+    color: "#ffffff",
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   containerLista: {
     paddingTop: 10,
   },
   card: {
-    backgroundColor: '#2A2D32',
+    backgroundColor: "#2A2D32",
     padding: 16,
     borderRadius: 8,
     marginBottom: 12,
     borderLeftWidth: 4,
-    borderLeftColor: '#d97706',
+    borderLeftColor: "#d97706",
   },
   cardTitle: {
     marginBottom: 4,
   },
   modalFundo: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
   },
   modalCaixa: {
-    width: '85%',
-    backgroundColor: '#1E1E1E',
+    width: "85%",
+    backgroundColor: "#1E1E1E",
     borderRadius: 12,
     padding: 20,
     elevation: 10,
   },
   modalTitulo: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#FFF',
+    fontWeight: "bold",
+    color: "#FFF",
     marginBottom: 15,
-    textAlign: 'center',
+    textAlign: "center",
   },
   input: {
-    backgroundColor: '#2A2D32',
-    color: '#FFF',
+    backgroundColor: "#2A2D32",
+    color: "#FFF",
     borderRadius: 8,
     padding: 12,
     marginBottom: 15,
     fontSize: 16,
   },
   botoesContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
   botao: {
     flex: 1,
     padding: 12,
     borderRadius: 8,
-    alignItems: 'center',
-    marginHorizontal: 5,
+    alignItems: "center",
+    marginHorizontal: 4,
   },
   botaoCancelar: {
-    backgroundColor: '#555',
+    backgroundColor: "#555",
   },
   botaoSalvar: {
-    backgroundColor: '#d97706',
+    backgroundColor: "#d97706",
+  },
+  // Estilo adicionado para o botão deletar na cor vermelha
+  botaoDeletar: {
+    backgroundColor: "red",
   },
   textoBotao: {
-    color: '#FFF',
-    fontWeight: 'bold',
+    color: "#FFF",
+    fontWeight: "bold",
     fontSize: 16,
-  }
+  },
 });

@@ -1,40 +1,88 @@
-import { StyleSheet, TouchableOpacity, Modal, TextInput, View, Text } from "react-native";
 import { useState } from "react";
+import {
+  Modal,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 import ParallaxScrollView from "@/components/parallax-scroll-view";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 
-// Formato de um Galpão para iniciar a lista vazia
 type Coleta = {
-  id: string;
-  dataHora: string;
-  quantidadeOvos: string;
+  id: number;
+  dataHora: Date;
+  quantidadeOvos: number;
 };
 
 export default function ColetasScreen() {
-  // A lista inicia vazia
   const [coletas, setColetas] = useState<Coleta[]>([]);
-  
   const [modalVisible, setModalVisible] = useState(false);
+  const [editarColeta, setEditarColeta] = useState<Coleta>();
   
-  const [novaDataHora, setNovaDataHora] = useState('');
-  const [novaQuantidadeOvos, setNovaQuantidadeOvos] = useState('');
+  const [novaQuantidadeOvos, setNovaQuantidadeOvos] = useState("");
 
   const salvarColeta = () => {
-    if (novaDataHora.trim() === '' || novaQuantidadeOvos.trim() === '') return;
+    if (!editarColeta) {
+      if (novaQuantidadeOvos.trim() === "") return;
+      const novaColeta = {
+        id: Date.now(), 
+        dataHora: new Date(), 
+        quantidadeOvos: Number(novaQuantidadeOvos), 
+      };
 
-    const novaColeta = {
-      id: Math.random().toString(),
-      dataHora: novaDataHora,
-      quantidadeOvos: novaQuantidadeOvos 
-    };
+      setColetas([...coletas, novaColeta]);
 
-    setColetas([...coletas, novaColeta]);
-    
-    setNovaDataHora('');
-    setNovaQuantidadeOvos('');
-    setModalVisible(false);
+      setNovaQuantidadeOvos("");
+      setModalVisible(false);
+    } else {
+      if (novaQuantidadeOvos.trim() === "") return;
+
+      const editar = {
+        id: editarColeta.id,
+        dataHora: editarColeta.dataHora, 
+        quantidadeOvos: Number(novaQuantidadeOvos), 
+      };
+
+      setColetas(
+        coletas.map((coleta) => {
+          if (coleta.id === editarColeta.id) {
+            return editar;
+          } else {
+            return coleta;
+          }
+        }),
+      );
+
+      setNovaQuantidadeOvos("");
+      setEditarColeta(undefined);
+      setModalVisible(false);
+    }
+  };
+
+  const prepararEdicao = (coletaClicada: Coleta) => {
+    setEditarColeta(coletaClicada);
+    setNovaQuantidadeOvos(coletaClicada.quantidadeOvos.toString());
+    setModalVisible(true);
+  };
+
+  const deletarColeta = () => {
+    if (editarColeta) {
+      setColetas(coletas.filter((coleta) => coleta.id !== editarColeta.id));
+
+      setNovaQuantidadeOvos("");
+      setEditarColeta(undefined);
+      setModalVisible(false);
+    }
+  };
+
+  const abrirModalNovo = () => {
+    setEditarColeta(undefined);
+    setNovaQuantidadeOvos("");
+    setModalVisible(true);
   };
 
   return (
@@ -42,23 +90,33 @@ export default function ColetasScreen() {
       <ParallaxScrollView
         headerBackgroundColor={{ light: "#ffffff", dark: "#000000" }}
         headerImage={
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.addButtonHeader}
-            onPress={() => setModalVisible(true)}
+            onPress={abrirModalNovo}
           >
-            <ThemedText style={styles.addButtonText}>+ Adicionar Coleta</ThemedText>
+            <ThemedText style={styles.addButtonText}>
+              + Adicionar Coleta
+            </ThemedText>
           </TouchableOpacity>
         }
       >
         <ThemedView style={styles.containerLista}>
-          <ThemedText type="title" style={{ marginBottom: 15 }}>Minhas Coletas</ThemedText>
-          
-          {/* Onde os cards da lista são desenhados */}
+          <ThemedText type="title" style={{ marginBottom: 15 }}>
+            Minhas Coletas
+          </ThemedText>
+
           {coletas.map((coleta) => (
-            <View key={coleta.id} style={styles.card}>
-              <ThemedText type="subtitle" style={styles.cardTitle}>Data e hora: {coleta.dataHora}</ThemedText>
+            <TouchableOpacity
+              key={coleta.id}
+              style={styles.card}
+              onPress={() => prepararEdicao(coleta)}
+            >
+              {/* O JavaScript formata a data automática para o padrão brasileiro aqui na tela */}
+              <ThemedText type="subtitle" style={styles.cardTitle}>
+                Data: {coleta.dataHora.toLocaleDateString("pt-BR")} às {coleta.dataHora.toLocaleTimeString("pt-BR", { hour: '2-digit', minute:'2-digit' })}
+              </ThemedText>
               <ThemedText>Quantidade: {coleta.quantidadeOvos} ovos</ThemedText>
-            </View>
+            </TouchableOpacity>
           ))}
         </ThemedView>
       </ParallaxScrollView>
@@ -71,16 +129,11 @@ export default function ColetasScreen() {
       >
         <View style={styles.modalFundo}>
           <View style={styles.modalCaixa}>
-            <Text style={styles.modalTitulo}>Nova Coleta</Text>
+            <Text style={styles.modalTitulo}>
+              {editarColeta ? "Corrigir Quantidade" : "Nova Coleta"}
+            </Text>
 
-            <TextInput
-              style={styles.input}
-              placeholder="Data e hora"
-              placeholderTextColor="#999"
-              value={novaDataHora}
-              onChangeText={setNovaDataHora}
-            />
-
+            {/* O ÚNICO campo de texto do modal inteiro */}
             <TextInput
               style={styles.input}
               placeholder="Quantidade de ovos"
@@ -91,15 +144,25 @@ export default function ColetasScreen() {
             />
 
             <View style={styles.botoesContainer}>
-              <TouchableOpacity 
-                style={[styles.botao, styles.botaoCancelar]} 
+              <TouchableOpacity
+                style={[styles.botao, styles.botaoCancelar]}
                 onPress={() => setModalVisible(false)}
               >
                 <Text style={styles.textoBotao}>Cancelar</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity 
-                style={[styles.botao, styles.botaoSalvar]} 
+              {/* Só aparece se tiver uma coleta na prancheta para ser deletada */}
+              {editarColeta && (
+                <TouchableOpacity
+                  style={[styles.botao, styles.botaoDeletar]}
+                  onPress={deletarColeta}
+                >
+                  <Text style={styles.textoBotao}>Deletar</Text>
+                </TouchableOpacity>
+              )}
+
+              <TouchableOpacity
+                style={[styles.botao, styles.botaoSalvar]}
                 onPress={salvarColeta}
               >
                 <Text style={styles.textoBotao}>Salvar</Text>
@@ -114,81 +177,84 @@ export default function ColetasScreen() {
 
 const styles = StyleSheet.create({
   addButtonHeader: {
-    alignSelf: 'center',
+    alignSelf: "center",
     marginTop: 100,
-    backgroundColor: '#d97706',
+    backgroundColor: "#d97706",
     paddingVertical: 14,
     paddingHorizontal: 32,
     borderRadius: 30,
     elevation: 6,
   },
   addButtonText: {
-    color: '#ffffff',
+    color: "#ffffff",
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   containerLista: {
     paddingTop: 10,
   },
   card: {
-    backgroundColor: '#2A2D32',
+    backgroundColor: "#2A2D32",
     padding: 16,
     borderRadius: 8,
     marginBottom: 12,
     borderLeftWidth: 4,
-    borderLeftColor: '#d97706',
+    borderLeftColor: "#d97706",
   },
   cardTitle: {
     marginBottom: 4,
   },
   modalFundo: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
   },
   modalCaixa: {
-    width: '85%',
-    backgroundColor: '#1E1E1E',
+    width: "85%",
+    backgroundColor: "#1E1E1E",
     borderRadius: 12,
     padding: 20,
     elevation: 10,
   },
   modalTitulo: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#FFF',
+    fontWeight: "bold",
+    color: "#FFF",
     marginBottom: 15,
-    textAlign: 'center',
+    textAlign: "center",
   },
   input: {
-    backgroundColor: '#2A2D32',
-    color: '#FFF',
+    backgroundColor: "#2A2D32",
+    color: "#FFF",
     borderRadius: 8,
     padding: 12,
     marginBottom: 15,
     fontSize: 16,
   },
   botoesContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
   botao: {
     flex: 1,
     padding: 12,
     borderRadius: 8,
-    alignItems: 'center',
-    marginHorizontal: 5,
+    alignItems: "center",
+    marginHorizontal: 4,
   },
   botaoCancelar: {
-    backgroundColor: '#555',
+    backgroundColor: "#555",
   },
   botaoSalvar: {
-    backgroundColor: '#d97706',
+    backgroundColor: "#d97706",
+  },
+  botaoDeletar: {
+    backgroundColor: "red",
   },
   textoBotao: {
-    color: '#FFF',
-    fontWeight: 'bold',
+    color: "#FFF",
+    fontWeight: "bold",
     fontSize: 16,
-  }
+  },
 });

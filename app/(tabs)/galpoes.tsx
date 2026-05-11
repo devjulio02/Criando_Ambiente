@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Modal,
   StyleSheet,
@@ -7,16 +7,19 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import ParallaxScrollView from "@/components/parallax-scroll-view";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import * as Location from 'expo-location';
 
 // Formato de um Galpão para iniciar a lista vazia
 type Galpao = {
   id: number;
   nome: string;
   capacidade: number;
+  latitude?: number;
+  longitude?: number;
 };
 
 export default function GalpoesScreen() {
@@ -30,6 +33,35 @@ export default function GalpoesScreen() {
   const [novoNome, setNovoNome] = useState("");
   const [novaCap, setNovaCap] = useState("");
 
+  const [localizacao, setLocalizacao] = useState<Location.LocationObject | null>(null);
+
+  //Quando a tela abre essa função ler os dados;
+  useEffect (() => {
+    async function getData() {
+      try {
+        const data = await AsyncStorage.getItem("@GalpoesApp:galpoes");
+        if (data !== null) {
+          setGalpoes(JSON.parse(data));
+        }
+      } catch(e) {
+        console.log("Erro ao ler dados", e);
+      }
+    }
+    getData();
+  }, []);
+
+  useEffect(() => {
+      (async () => {
+        let { status } = await Location.requestForegroundPermissionsAsync(); 
+        if (status !== 'granted') {
+          console.log('Permissão negada'); 
+          return;
+        }
+        let location = await Location.getCurrentPositionAsync({}); 
+        setLocalizacao(location);
+      })();
+  }, []);
+
   const salvarGalpao = () => {
     if (!editarGalpao) {
       if (novoNome.trim() === "" || novaCap.trim() === "") return;
@@ -37,9 +69,14 @@ export default function GalpoesScreen() {
         id: Date.now(),
         nome: novoNome,
         capacidade: Number(novaCap),
+        latitude: localizacao?.coords.latitude,
+        longitude: localizacao?.coords.longitude,
       };
 
-      setGalpoes([...galpoes, novo]);
+      //Salvar ultilizando AsyncStorage;
+      const novaLista = [...galpoes, novo];
+      setGalpoes(novaLista);
+      AsyncStorage.setItem("@GalpoesApp:galpoes", JSON.stringify(novaLista));
 
       setNovoNome("");
       setNovaCap("");
@@ -50,17 +87,21 @@ export default function GalpoesScreen() {
         id: editarGalpao.id,
         nome: novoNome,
         capacidade: Number(novaCap),
+        latitude: editarGalpao.latitude, 
+        longitude: editarGalpao.longitude, 
       };
 
-      setGalpoes(
-        galpoes.map((galpao) => {
-          if (galpao.id === editarGalpao.id) {
-            return editar;
-          } else {
-            return galpao;
-          }
-        }),
-      );
+      //Editar utilizando o AsyncStorage;
+      const novaLista = galpoes.map((galpao) => {
+        if (galpao.id === editarGalpao.id) {
+          return editar;
+        } else {
+          return galpao;
+        }
+      });
+      
+      setGalpoes(novaLista);
+      AsyncStorage.setItem("@GalpoesApp:galpoes", JSON.stringify(novaLista));
 
       setNovoNome("");
       setNovaCap("");
@@ -78,8 +119,12 @@ export default function GalpoesScreen() {
 
   const deletarGalpao = () => {
     if (editarGalpao) {
-      setGalpoes(galpoes.filter((galpao) => galpao.id !== editarGalpao.id));
-
+      //Deletar utilizando o AsyncStorage.
+      const novaLista = galpoes.filter((galpao) => galpao.id !== editarGalpao.id);
+      
+      setGalpoes(novaLista);
+      AsyncStorage.setItem("@GalpoesApp:galpoes", JSON.stringify(novaLista));
+      
       setNovoNome("");
       setNovaCap("");
       setEditarGalpao(undefined);
@@ -125,6 +170,11 @@ export default function GalpoesScreen() {
                 Nome: {galpao.nome}
               </ThemedText>
               <ThemedText>Capacidade: {galpao.capacidade} aves</ThemedText>
+              {galpao.latitude && galpao.longitude && (
+                <ThemedText style={{ fontSize: 12, color: '#aaa', marginTop: 4 }}>
+                    Localização: {galpao.latitude.toFixed(4)}, {galpao.longitude.toFixed(4)}
+                </ThemedText>
+              )}
             </TouchableOpacity>
           ))}
         </ThemedView>

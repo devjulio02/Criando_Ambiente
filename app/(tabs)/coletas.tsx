@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Modal,
   StyleSheet,
@@ -7,15 +7,18 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import ParallaxScrollView from "@/components/parallax-scroll-view";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import * as Location from 'expo-location';
 
 type Coleta = {
   id: number;
   dataHora: Date;
   quantidadeOvos: number;
+  latitude?: number;
+  longitude?: number;
 };
 
 export default function ColetasScreen() {
@@ -25,6 +28,41 @@ export default function ColetasScreen() {
   
   const [novaQuantidadeOvos, setNovaQuantidadeOvos] = useState("");
 
+  const [localizacao, setLocalizacao] = useState<Location.LocationObject | null>(null);
+
+  useEffect(() => {
+    async function getData() {
+      try {
+        const data = await AsyncStorage.getItem("@ColetasApp:coletas");
+        if (data !== null) {
+          const coletasSalvas = JSON.parse(data);
+          //Ajuste para lidar com a data do mesmo jeito que estava antes;
+          const coletasComDataReal = coletasSalvas.map((coleta: any) => ({
+            ...coleta,
+            dataHora: new Date(coleta.dataHora) 
+          }));
+          
+          setColetas(coletasComDataReal);
+        }
+      } catch (e) {
+        console.log("Erro ao ler coletas", e);
+      }
+    }
+    getData();
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      let { status } = await Location.requestForegroundPermissionsAsync(); 
+      if (status !== 'granted') {
+        console.log('Permissão negada'); 
+        return;
+      }
+      let location = await Location.getCurrentPositionAsync({}); 
+      setLocalizacao(location); 
+    })();
+  }, []);
+
   const salvarColeta = () => {
     if (!editarColeta) {
       if (novaQuantidadeOvos.trim() === "") return;
@@ -32,9 +70,15 @@ export default function ColetasScreen() {
         id: Date.now(), 
         dataHora: new Date(), 
         quantidadeOvos: Number(novaQuantidadeOvos), 
+        //Salva a coordenada lida junto com a nova coleta
+        latitude: localizacao?.coords.latitude,
+        longitude: localizacao?.coords.longitude,
       };
 
-      setColetas([...coletas, novaColeta]);
+      //Salvar;
+      const novaLista = [...coletas, novaColeta];
+      setColetas(novaLista);
+      AsyncStorage.setItem("@ColetasApp:coletas", JSON.stringify(novaLista));
 
       setNovaQuantidadeOvos("");
       setModalVisible(false);
@@ -44,18 +88,22 @@ export default function ColetasScreen() {
       const editar = {
         id: editarColeta.id,
         dataHora: editarColeta.dataHora, 
-        quantidadeOvos: Number(novaQuantidadeOvos), 
+        quantidadeOvos: Number(novaQuantidadeOvos),
+        latitude: editarColeta.latitude, // Mantém o GPS original
+        longitude: editarColeta.longitude, 
       };
 
-      setColetas(
-        coletas.map((coleta) => {
-          if (coleta.id === editarColeta.id) {
-            return editar;
-          } else {
-            return coleta;
-          }
-        }),
-      );
+      //Editar;
+      const novaLista = coletas.map((coleta) => {
+        if (coleta.id === editarColeta.id) {
+          return editar;
+        } else {
+          return coleta;
+        }
+      });
+
+      setColetas(novaLista);
+      AsyncStorage.setItem("@ColetasApp:coletas", JSON.stringify(novaLista));
 
       setNovaQuantidadeOvos("");
       setEditarColeta(undefined);
@@ -71,7 +119,12 @@ export default function ColetasScreen() {
 
   const deletarColeta = () => {
     if (editarColeta) {
-      setColetas(coletas.filter((coleta) => coleta.id !== editarColeta.id));
+      
+      //Deletar;
+      const novaLista = coletas.filter((coleta) => coleta.id !== editarColeta.id);
+
+      setColetas(novaLista);
+      AsyncStorage.setItem("@ColetasApp:coletas", JSON.stringify(novaLista));
 
       setNovaQuantidadeOvos("");
       setEditarColeta(undefined);
@@ -116,6 +169,11 @@ export default function ColetasScreen() {
                 Data: {coleta.dataHora.toLocaleDateString("pt-BR")} às {coleta.dataHora.toLocaleTimeString("pt-BR", { hour: '2-digit', minute:'2-digit' })}
               </ThemedText>
               <ThemedText>Quantidade: {coleta.quantidadeOvos} ovos</ThemedText>
+              {coleta.latitude && coleta.longitude && (
+                <ThemedText style={{ fontSize: 12, color: '#aaa', marginTop: 4 }}>
+                    Localização: {coleta.latitude.toFixed(4)}, {coleta.longitude.toFixed(4)}
+                </ThemedText>
+              )}
             </TouchableOpacity>
           ))}
         </ThemedView>
